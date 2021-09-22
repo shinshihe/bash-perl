@@ -1,0 +1,84 @@
+#!/bin/dash
+file=$*
+
+exist(){
+	# normally. flag=1,file exist
+	flag=1
+	if test ! -f $1
+	then
+		flag=0 # if not exist
+		index=$(cat ./.girt/index.txt)
+		for i in $index
+		do
+			name=${i%:*}
+			if test "$name" = "$1"
+			then
+				flag=2 # if is a deleted file,flag=2
+			 	echo $flag
+				return 0
+			fi
+		done
+	fi	
+	echo $flag
+	return 0
+}
+
+
+
+# if .girt not exist
+if test ! -d ".girt"
+then
+echo "girt-add: error: girt repository directory .girt not found"
+return 1
+fi
+
+
+
+index=$(cat ./.girt/index.txt)
+
+for i in $file
+do
+	flag=$(exist "$i")
+       	#echo $flag
+	# if not exist and not deleted
+	if test $flag -eq 0
+	then
+		echo "girt-add: error: can not open 'non_existent_file'"
+		continue
+	fi
+	
+	# if exist 
+	if test $flag -eq 1
+	then
+		#old_IFS=$IFS
+		point=1
+		cp -f "$i" ./.girt/tmp
+		for j in $index
+		do
+			name=${j%:*}
+			if test "$i" = "$name"
+			then
+			    # echo "change"
+				sed -i "s/$i:.*/$i:updated/g" ./.girt/index.txt
+				point=0
+				break
+			fi
+		done
+		if test $point -eq 1
+		then
+			echo "$i:added" >> ./.girt/index.txt
+		fi
+	fi
+	
+	# if file is a deleted file
+	if test $flag -eq 2
+	then
+		sed -i "s/$i:.*/$i:killed/g" ./.girt/index.txt
+		rm ./.girt/tmp/$i	
+	fi
+
+done
+
+
+
+

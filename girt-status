@@ -1,0 +1,191 @@
+#!/bin/dash
+
+# create status.txt
+if test -f ./.girt/status.txt
+then
+	rm ./.girt/status.txt
+	touch ./.girt/status.txt
+fi
+
+# compare the file in tmp and work to see if are the same
+tmp_work(){
+	#1 file
+	tmp=$(diff "$1" "./.girt/tmp/$1")
+	if test ${#tmp} -eq 0
+	then
+		# Is the same
+		echo 1
+	else
+		# different
+		echo 0
+	fi
+
+}
+
+
+
+
+text(){
+	# 1 name 2 case
+	case0=" - untracked"
+	case1=" - added to index"
+	case2=" - added to index, file changed"
+	case3=" - added to index, file deleted"
+	case4=" - same as repo"
+	case5=" - file changed, changes staged for commit"
+	case6=" - file changed, changes not staged for commit"
+	case7=" - file changed, different changes staged for commit"
+	case8=" - file deleted"
+	case9=" - deleted"
+	case $2 in 
+		0)
+		echo "$1""$case0"
+		;;
+		1)
+		echo "$1""$case1"
+		;;
+		2)
+		echo "$1""$case2"
+		;;
+		3)
+		echo "$1""$case3"
+		;;
+		4)
+		echo "$1""$case4"
+		;;
+		5)
+		echo "$1""$case5"
+		;;
+		6)
+		echo "$1""$case6"
+		;;
+		7)
+		echo "$1""$case7"
+		;;
+		8)
+		echo "$1""$case8"
+		;;
+		9)
+		echo "$1""$case9"
+		;;
+	esac
+}
+
+
+
+holy_add(){
+# 1 name 2 case
+	if test -f $1 # file is not deleted in working space
+	then
+		dif=$(diff "$1" "./.girt/tmp/$1" ) # file changed in working place
+		if test ${#dif} -gt 0
+		then
+			echo 2
+		else
+			echo 1 # file not changed in working place
+		fi
+	else
+		echo 3 #file deleted in working space
+	fi	
+}
+
+holy_committed(){
+	# 1 name 2 case
+	#if file is deleted
+	if test ! -f $1
+	then
+		echo 8
+	else
+		flag=$(tmp_work $1)
+		if test $flag -eq 0 # 1 same 0 different
+		then
+			echo 6
+		else
+			echo 4
+		fi
+	fi
+	
+}
+
+holy_updated(){
+	#1 name
+	if test ! -f $1
+	then
+		echo 3
+	else
+		flag=$(tmp_work $1)
+		if test $flag -eq 0 # 1 same 0 different
+		then
+			echo 7
+		else
+			echo 5
+		fi
+	fi
+}
+
+
+holy_deleted(){
+	#1 name
+	echo 9
+}
+
+
+
+
+
+
+index=$(cat ./.girt/index.txt)
+for i in $index
+do
+	file=${i%:*}
+	state=${i#*:}
+	#echo $file $state
+	case $state in 
+		added)
+			flag=$(holy_add "$file" "$state")
+			#echo flag is $flag
+			tmp=$(text "$file" "$flag")
+			echo $tmp >> ./.girt/status.txt
+			;;
+		committed)
+			flag=$(holy_committed "$file" "$state")
+			tmp=$(text "$file" "$flag")
+			echo $tmp >> ./.girt/status.txt
+			;;
+		updated)
+			# echo "updated"
+			flag=$(holy_updated "$file" "$state")
+			tmp=$(text "$file" "$flag")
+			echo $tmp >> ./.girt/status.txt
+			;;
+		deleted)
+			flag=$(holy_deleted "$file" "$state")
+			tmp=$(text "$file" "$flag")
+			echo $tmp >> ./.girt/status.txt
+			;;
+
+	esac
+done
+
+workfile=$(ls)
+for i in $workfile
+do
+	flag=0
+	for j in $index
+	do
+		name=${j%:*}
+		if test "$i" = "$name" 
+		then
+			flag=1 # the file in work space has record in index
+			break
+		fi
+	done 
+	if test $flag -eq 0 #if no record
+	then
+		tmp=$(text "$i" "0")
+		echo $tmp >> ./.girt/status.txt
+	fi
+done
+
+cat ./.girt/status.txt | sort
+

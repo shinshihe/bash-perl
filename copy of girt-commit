@@ -1,0 +1,156 @@
+#!/bin/dash
+tmp_path="./.girt/tmp/"
+save_patn="./.girt/save/"
+if test ! -f "./.girt/save/log.txt" 
+then
+	touch "./.girt/save/log.txt"
+fi
+
+#if -m
+case "$1" in 
+-m)
+#	echo "it's -m"
+file=$(ls ./.girt/tmp)
+
+for i in $file
+do
+	cp -f ./.girt/tmp/$i ./.girt/save
+done
+
+quit=0
+add="_"
+add1="_*"
+cd ./.girt/save
+# test if all the files are the same
+for i in $file
+do 
+	tmp="$i""$add1"
+	count=$(ls $tmp | wc -w) 2> /dev/null
+#	mv $i "$i""$add""$count" 
+        if test $count -eq 0    # if there is no such file
+	then
+		quit=$(( $quit + 1))
+		break
+	else
+		newest=$(( $count -1))
+		newest_name="$i""$add""$newest"
+		different=$( diff $i $newest_name)
+		if test ${#different} -gt 0
+		then
+			quit=$(( $quit + 1))
+			break
+		fi
+	fi
+done
+
+# delet the files
+if test $quit -eq 0
+then
+echo nothing to commit
+for i in $file
+do
+	rm -f $i
+done
+return 1
+fi
+
+#change the file names to match their versions
+for i in $file
+do 
+	tmp="$i""$add1"
+	count=$(ls $tmp | wc -w) 2> /dev/null
+	mv $i "$i""$add""$count" 
+done
+
+#change the commit number
+count=$(cat log.txt | wc -l)
+word=$2
+if test $count -eq 0
+then
+echo "$count $2" > log.txt
+else
+	sed -i "1i $count $2" log.txt
+
+fi
+echo "Committed as commit $count"
+
+# change the state into commited
+cd ../
+for i in $file
+do
+	sed -i "s/$i:.*/$i:committed/g" index.txt
+done
+
+;;
+
+-a)
+# check if all files in index.txt exist
+index=$(cat ./.girt/index.txt)
+file_exist=1
+for i in $index
+do
+	filename=${i%:*}
+	if test ! -f "$filename"
+	then
+		file_exist=0
+		break
+	fi
+done	
+#echo "all file exist"
+#  all files exist, check if there is difference between work file and save file
+if test $file_exist -eq 1
+then
+	change=0  # if the files not changed
+	version=$(cat ./.girt/save/log.txt | wc -l)
+	last=$(($version-1))
+	for i in $index
+	do
+		filename=${i%:*}
+		#echo $filename 
+		lastname=""$filename"_"$last""
+		# if file in save not exist
+		if test ! -f ./.girt/save/$lastname 
+		then
+			#echo "file name is $lastname"
+			#echo "file not in save yet"
+			change=1
+			break
+		fi
+	        #it the file exist
+		tmp=$(diff $filename ./.girt/save/$lastname)
+		if test ${#tmp} -gt 0
+		then
+			change=1
+			break
+		fi
+	done
+	# if there is change,copy all files to tmp and save and rename
+	if test $change -eq 1
+	then
+		for i in $index
+		do
+			filename=${i%:*}
+			newname=""$filename"_"$version""
+			cp -f $filename ./.girt/tmp
+			cp -f $filename ./.girt/save/$newname
+			sed -i "s/$filename:.*/$filename:committed/g" ./.girt/index.txt
+		done
+		# print the commit and change log.txt
+		#change the commit number
+	       	#count=$(cat ./.girt/save/log.txt | wc -l)
+        	if test $version -eq 0
+	       	then
+			echo "$version $3" >> ./.girt/save/log.txt
+       		else
+			sed -i "1i $version $3" ./.girt/save/log.txt
+		fi
+		echo "Committed as commit $version"
+	else
+		# no change has been made, do nothing
+		echo "girt-commit: error: nothing to commit"
+	fi
+fi
+#echo "gg"
+;;
+
+esac

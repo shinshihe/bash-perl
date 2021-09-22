@@ -1,0 +1,45 @@
+#!/bin/dash
+a=$*
+old_IFS=$IFS
+IFS=':'
+
+set -- $a
+version=$1
+name=$2
+IFS=$old_IFS
+#echo $version
+#echo $name
+# show the file in tmp
+if test "$version" = ""
+then #echo "empty"
+	cd ./.girt/tmp
+	if test -f $name
+	then 
+		cat $name
+	else
+		echo "girt-show: error: '$name' not found in index"
+		return 1
+	fi
+else
+	
+	newname=""$name"_"$version""
+	commit_num=$(cat ./.girt/log.txt | wc -l)
+	cd ./.girt/save
+	if test -f $newname
+	then
+		cat $newname
+	else
+		commit_num=$(( $commit_num - 1))
+#echo $commit_num
+		if test $commit_num -lt $version
+		then
+			echo "girt-show: error: unknown commit '$version'"
+			return 1
+		else
+			echo "girt-show: error: '$name' not found in commit $version"
+			return 1
+		fi
+	fi
+	
+fi
+
